@@ -7,9 +7,9 @@ require 'scanner'
 
 class Jabl
   Line = Struct.new(:text, :tabs, :index)
-  Node = Struct.new(:text, :index, :children, :scanner)
+  Node = Struct.new(:text, :index, :children, :next, :prev, :parsed, :scanner)
 
-  DIRECT_BLOCK_STATEMENTS = %w[if while for with]
+  DIRECT_BLOCK_STATEMENTS = %w[while for with]
 
   def initialize(string)
     @tree, _ = tree(tabulate(string))
@@ -39,6 +39,8 @@ class Jabl
   private
 
   def compile(node, tabs)
+    return '' if node.parsed
+
     if node.children.empty?
       if node.scanner.scan /\./; compile_scoped node, tabs
       else tabs(tabs) + node.text + ";\n"
@@ -49,7 +51,7 @@ class Jabl
       end
 
       if node.scanner.keyword :fun; compile_fun node, tabs
-      elsif node.scanner.keyword :else; compile_else node, tabs
+      elsif node.scanner.keyword :if; compile_if node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
       elsif node.scanner.scan /\:/; compile_event node, tabs
       else; raise "Invalid parse node: #{node.inspect}"
@@ -68,9 +70,9 @@ class Jabl
     args = []
     if node.scanner.scan(/\(/)
       loop do
-        node.scanner.whitespace?
+        node.scanner.whitespace
         args << node.scanner.identifier!
-        node.scanner.whitespace?
+        node.scanner.whitespace
         unless node.scanner.scan(/,/)
           node.scanner.scan!(/\)/)
           break
@@ -84,13 +86,23 @@ class Jabl
 END
   end
 
+  def compile_if(node, tabs)
+    str = compile_block('if', node, tabs)
+    while node.next && node.next.scanner.keyword(:else)
+      node = node.next
+      node.parsed = true
+      str.rstrip! << ' ' << compile_else(node, tabs)
+    end
+    str
+  end
+
   def compile_else(node, tabs)
-    if node.scanner.whitespace?
+    if node.scanner.whitespace
       node.scanner.keyword! 'if'
-      compile_block('else if', node, tabs)
+      compile_block('else if', node, tabs).lstrip
     else
       <<END
-#{tabs(tabs)}else {
+else {
 #{compile_nodes(node.children, tabs + 1)}}
 END
     end
@@ -127,9 +139,9 @@ END
   def compile_event(node, tabs)
     event = node.scanner.identifier!
     if node.scanner.scan(/\(/)
-      node.scanner.whitespace?
+      node.scanner.whitespace
       var = event.scanner.identifier
-      node.scanner.whitespace?
+      node.scanner.whitespace
       node.scanner.scan!(/\)/)
     end
     node.scanner.eos!
@@ -171,6 +183,10 @@ END
   end
 
   def parse_nodes(nodes)
+    nodes.each_cons(2) do |n, s|
+      n.next = s
+      s.prev = n if s
+    end
     nodes.each do |n|
       n.children = parse_nodes(n.children)
       n.scanner = Scanner.new(n.text)

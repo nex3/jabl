@@ -10,10 +10,6 @@ class Jabl
       scan(/\s+/)
     end
 
-    def whitespace?
-      scan(/\s*/)
-    end
-
     def identifier
       scan(/\w+/)
     end
@@ -28,7 +24,7 @@ class Jabl
       name = name.to_s
       res = send(name[0...-1], *args, &block)
       return res if res
-      raise "Expected #{name[0...-1]}(#{args.inspect[1...-1]})"
+      raise "Expected #{name[0...-1]}(#{args.inspect[1...-1]}), was #{rest.inspect}"
     end
   end
 end
