@@ -40,9 +40,9 @@ class Jabl
 
   def compile(node, tabs)
     return '' if node.parsed
-
     if node.children.empty?
       if node.scanner.scan /\./; compile_scoped node, tabs
+      elsif node.scanner.keyword :switch; compile_switch node, tabs
       else tabs(tabs) + node.text + ";\n"
       end
     else
@@ -55,7 +55,7 @@ class Jabl
       elsif node.scanner.keyword :do; compile_do_while node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
       elsif node.scanner.scan /\:/; compile_event node, tabs
-      else; raise "Invalid parse node: #{node.inspect}"
+      else; raise "Invalid parse node: #{node.text.inspect}"
       end
     end
   end
@@ -120,6 +120,33 @@ END
 #{tabs(tabs)}do {
 #{compile_nodes(node.children, tabs + 1)}} while (#{exp});
 END
+  end
+
+  def compile_switch(node, tabs)
+    node.scanner.whitespace!
+    str = <<END
+#{tabs(tabs)}switch (#{node.scanner.scan!(/.+/)}) {
+END
+
+    while node = node.next
+      if node.scanner.keyword(:case)
+        node.parsed = true
+        node.scanner.whitespace!
+        clause = "case #{node.scanner.scan!(/.+/)}"
+      elsif node.scanner.keyword(:default)
+        node.parsed = true
+        clause = "default"
+      else
+        break
+      end
+
+      str << <<END
+#{tabs(tabs)}#{clause}:
+#{compile_nodes(node.children, tabs + 1).rstrip}
+END
+    end
+
+    str + tabs(tabs) + "}\n"
   end
 
   def compile_block(name, node, tabs)
