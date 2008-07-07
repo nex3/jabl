@@ -53,6 +53,7 @@ class Jabl
       if node.scanner.keyword :fun; compile_fun node, tabs
       elsif node.scanner.keyword :if; compile_if node, tabs
       elsif node.scanner.keyword :do; compile_do_while node, tabs
+      elsif node.scanner.keyword :try; compile_try node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
       elsif node.scanner.scan /\:/; compile_event node, tabs
       else; raise "Invalid parse node: #{node.text.inspect}"
@@ -147,6 +148,31 @@ END
     end
 
     str + tabs(tabs) + "}\n"
+  end
+
+  def compile_try(node, tabs)
+    node.scanner.eos!
+    str = <<END
+#{tabs(tabs)}try {
+#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
+END
+
+    if node.next && node.next.scanner.keyword(:catch)
+      node = node.next
+      node.parsed = true
+      str.rstrip! << ' ' << compile_block(:catch, node, tabs).lstrip
+    end
+
+    if node.next && node.next.scanner.keyword(:finally)
+      node = node.next
+      node.parsed = true
+      str.rstrip! << ' ' << <<END
+finally {
+#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
+END
+    end
+
+    str
   end
 
   def compile_block(name, node, tabs)
