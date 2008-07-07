@@ -18,7 +18,7 @@ class Jabl
       scan(/\w+/)
     end
 
-    def assert_empty!
+    def eos!
       return if eos?
       raise "Expected end of line, got #{rest.inspect}"
     end

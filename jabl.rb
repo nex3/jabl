@@ -44,6 +44,7 @@ class Jabl
     else
       if node.scanner.keyword :fun; compile_fun node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
+      elsif node.scanner.scan /\:/; compile_event node, tabs
       else; raise "Invalid parse node: #{node.inspect}"
       end
     end
@@ -93,6 +94,22 @@ END
 
   def compile_scoped(node, tabs)
     "#{tabs(tabs)}_jabl_context.#{node.scanner.scan!(/.+/)};\n"
+  end
+
+  def compile_event(node, tabs)
+    event = node.scanner.identifier!
+    if node.scanner.scan(/\(/)
+      node.scanner.whitespace?
+      var = event.scanner.identifier
+      node.scanner.whitespace?
+      node.scanner.scan!(/\)/)
+    end
+    node.scanner.eos!
+
+    <<END
+#{tabs(tabs)}_jabl_context.on(#{event.inspect}, function(#{var.inspect if var}) {
+#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}});
+END
   end
 
   def tabulate(string)
