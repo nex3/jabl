@@ -52,6 +52,7 @@ class Jabl
 
       if node.scanner.keyword :fun; compile_fun node, tabs
       elsif node.scanner.keyword :if; compile_if node, tabs
+      elsif node.scanner.keyword :do; compile_do_while node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
       elsif node.scanner.scan /\:/; compile_event node, tabs
       else; raise "Invalid parse node: #{node.inspect}"
@@ -106,6 +107,19 @@ else {
 #{compile_nodes(node.children, tabs + 1)}}
 END
     end
+  end
+
+  def compile_do_while(node, tabs)
+    next_node = node.next
+    next_node.scanner.keyword! 'while'
+    next_node.scanner.whitespace!
+    exp = next_node.scanner.scan!(/.+/)
+    next_node.parsed = true
+
+    <<END
+#{tabs(tabs)}do {
+#{compile_nodes(node.children, tabs + 1)}} while (#{exp});
+END
   end
 
   def compile_block(name, node, tabs)
