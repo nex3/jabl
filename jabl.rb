@@ -54,6 +54,7 @@ class Jabl
       elsif node.scanner.keyword :if; compile_if node, tabs
       elsif node.scanner.keyword :do; compile_do_while node, tabs
       elsif node.scanner.keyword :try; compile_try node, tabs
+      elsif node.scanner.keyword :let; parse_let node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
       elsif node.scanner.scan /\:/; compile_event node, tabs
       else; raise "Invalid parse node: #{node.text.inspect}"
@@ -175,6 +176,28 @@ END
     str
   end
 
+  def parse_let(node, tabs)
+    node.scanner.whitespace!
+
+    terms = []
+    loop do
+      term = []
+      node.scanner.whitespace
+      term << node.scanner.identifier!
+      node.scanner.whitespace
+      node.scanner.scan!(/=/)
+      node.scanner.whitespace
+      term << node.scanner.scan!(/[^,]+/) # TODO: Actually parse expression
+      terms << term
+      unless node.scanner.scan(/,/)
+        node.scanner.eos!
+        break
+      end
+    end
+
+    compile_let(terms, tabs) {|tabs| compile_nodes(node.children, tabs)}
+  end
+
   def compile_block(name, node, tabs)
     node.scanner.whitespace!
 
@@ -189,13 +212,13 @@ END
   end
 
   def compile_context(var, tabs, &block)
-    compile_let({:_jabl_context => var}, tabs, &block)
+    compile_let([[:_jabl_context, var]], tabs, &block)
   end
 
   def compile_let(vars, tabs)
     <<END
-#{tabs(tabs)}(function(#{vars.keys.join(", ")}) {
-#{yield(tabs + 1)}})(#{vars.values.join(", ")});
+#{tabs(tabs)}(function(#{vars.map {|n, v| n}.join(", ")}) {
+#{yield(tabs + 1)}})(#{vars.map {|n, v| v}.join(", ")});
 END
   end
 
