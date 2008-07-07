@@ -9,6 +9,8 @@ class Jabl
   Line = Struct.new(:text, :tabs, :index)
   Node = Struct.new(:text, :index, :children, :scanner)
 
+  DIRECT_BLOCK_STATEMENTS = [if while for with]
+
   def initialize(string)
     @tree, _ = tree(tabulate(string))
     parse_nodes @tree
@@ -42,6 +44,10 @@ class Jabl
       else tabs(tabs) + node.text + ";\n"
       end
     else
+      DIRECT_BLOCK_STATEMENTS.each do |name|
+        return compile_block name, node, tabs if node.scanner.keyword name
+      end
+
       if node.scanner.keyword :fun; compile_fun node, tabs
       elsif node.scanner.scan /\$/; compile_selector node, tabs
       elsif node.scanner.scan /\:/; compile_event node, tabs
@@ -73,6 +79,15 @@ class Jabl
 
     <<END
 #{tabs(tabs)}function #{name}(#{args.join(', ')}) {
+#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
+END
+  end
+
+  def compile_block(name, node, tabs)
+    node.scanner.whitespace!
+
+    <<END
+#{tabs(tabs)}#{name} (#{node.scanner.scan!(/.+/)}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
 END
   end
