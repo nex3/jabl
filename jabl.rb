@@ -37,10 +37,15 @@ class Jabl
   private
 
   def compile(node, tabs)
-    return tabs(tabs) + node.text + ";\n" if node.children.empty?
-
-    if node.scanner.keyword :fun; compile_fun node, tabs
-    else; raise "Invalid parse node: #{node.inspect}"
+    if node.children.empty?
+      if node.scanner.scan /\./; compile_scoped node, tabs
+      else tabs(tabs) + node.text + ";\n"
+      end
+    else
+      if node.scanner.keyword :fun; compile_fun node, tabs
+      elsif node.scanner.scan /\$/; compile_selector node, tabs
+      else; raise "Invalid parse node: #{node.inspect}"
+      end
     end
   end
 
@@ -69,6 +74,25 @@ class Jabl
 #{tabs(tabs)}function #{name}(#{args.join(', ')}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
 END
+  end
+
+  def compile_selector(node, tabs)
+    compile_context("$(#{node.scanner.scan!(/.+/).inspect})", tabs) { |t| compile_nodes(node.children, t) }
+  end
+
+  def compile_context(var, tabs, &block)
+    compile_let({:_jabl_context => var}, tabs, &block)
+  end
+
+  def compile_let(vars, tabs)
+    <<END
+#{tabs(tabs)}(function(#{vars.keys.join(", ")}) {
+#{yield(tabs + 1)}})(#{vars.values.join(", ")});
+END
+  end
+
+  def compile_scoped(node, tabs)
+    "#{tabs(tabs)}_jabl_context.#{node.scanner.scan!(/.+/)};\n"
   end
 
   def tabulate(string)
@@ -113,3 +137,5 @@ END
     '  ' * tabs
   end
 end
+
+puts Jabl.new($stdin.read).render if $0 == __FILE__
