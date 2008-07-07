@@ -1,11 +1,13 @@
 require 'rubygems'
 require 'enumerator'
-require 'lexer'
-require 'grammar'
+require 'scanner'
+#require 'lexer'
+#require 'grammar'
+#require 'parse_node'
 
 class Jabl
   Line = Struct.new(:text, :tabs, :index)
-  Node = Struct.new(:text, :index, :children, :parsed)
+  Node = Struct.new(:text, :index, :children, :scanner)
 
   def initialize(string)
     @tree, _ = tree(tabulate(string))
@@ -28,14 +30,17 @@ class Jabl
     end.join(',')
   end
 
+  def parse_tree
+    @tree
+  end
+
   private
 
   def compile(node, tabs)
-    return tabs(tabs) + node.text + ";\n" if node.parsed.nil?
+    return tabs(tabs) + node.text + ";\n" if node.children.empty?
 
-    case node.parsed.first
-    when "fun_statement"; compile_fun node, tabs
-    else; raise "Invalid parse node: #{node.parsed.inspect}"
+    if node.scanner.keyword :fun; compile_fun node, tabs
+    else; raise "Invalid parse node: #{node.inspect}"
     end
   end
 
@@ -44,8 +49,24 @@ class Jabl
   end
 
   def compile_fun(node, tabs)
+    node.scanner.whitespace!
+    name = node.scanner.identifier!
+
+    args = []
+    if node.scanner.scan(/\(/)
+      loop do
+        node.scanner.whitespace?
+        args << node.scanner.identifier!
+        node.scanner.whitespace?
+        unless node.scanner.scan(/,/)
+          node.scanner.scan!(/\)/)
+          break
+        end
+      end
+    end
+
     <<END
-#{tabs(tabs)}function #{node.parsed[1][2][1]}() {
+#{tabs(tabs)}function #{name}(#{args.join(', ')}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
 END
   end
@@ -82,15 +103,10 @@ END
 
   def parse_nodes(nodes)
     nodes.each do |n|
-      next if n.children.empty?
       n.children = parse_nodes(n.children)
-      n.parsed = simplify_parse(NestParser.parse(NestLexer.lex(n.text)))
+      n.scanner = Scanner.new(n.text)
+      #_, n.parsed = ParseNode.from_node(NestParser.parse(NestLexer.lex(n.text)))
     end
-  end
-
-  def simplify_parse(node)
-    return [node.token.symbol_name, node.token.value] if node.is_a? Dhaka::ParseTreeLeafNode
-    [node.production.name] + node.child_nodes.map(&method(:simplify_parse))
   end
 
   def tabs(tabs)
