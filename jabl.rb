@@ -218,7 +218,7 @@ END
   def compile_let(vars, tabs)
     <<END
 #{tabs(tabs)}(function(#{vars.map {|n, v| n}.join(", ")}) {
-#{yield(tabs + 1)}})(#{vars.map {|n, v| v}.join(", ")});
+#{yield(tabs + 1)}#{tabs(tabs)})(#{vars.map {|n, v| v}.join(", ")});
 END
   end
 
