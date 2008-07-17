@@ -196,7 +196,7 @@ END
       end
     end
 
-    compile_let(terms, tabs) {|tabs| compile_nodes(node.children, tabs)}
+    compile_let(terms, tabs, node.children)
   end
 
   def compile_block(name, node, tabs)
@@ -209,17 +209,17 @@ END
   end
 
   def compile_selector(node, tabs)
-    compile_context("$(#{node.scanner.scan!(/.+/).inspect})", tabs) { |t| compile_nodes(node.children, t) }
+    compile_context("$(#{node.scanner.scan!(/.+/).inspect})", tabs, node.children)
   end
 
-  def compile_context(var, tabs, &block)
-    compile_let([[:_jabl_context, var]], tabs, &block)
+  def compile_context(var, tabs, children)
+    compile_let([[:_jabl_context, var]], tabs, children)
   end
 
-  def compile_let(vars, tabs)
+  def compile_let(vars, tabs, children)
     <<END
 #{tabs(tabs)}(function(#{vars.map {|n, v| n}.join(", ")}) {
-#{yield(tabs + 1)}#{tabs(tabs)})(#{vars.map {|n, v| v}.join(", ")});
+#{compile_nodes(children, tabs + 1)}#{tabs(tabs)})(#{vars.map {|n, v| v}.join(", ")});
 END
   end
 
