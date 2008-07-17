@@ -1,15 +1,11 @@
 require 'rubygems'
 require 'enumerator'
-require 'scanner'
-#require 'lexer'
-#require 'grammar'
-#require 'parse_node'
+require 'node'
 
 class Jabl
   Line = Struct.new(:text, :tabs, :index)
-  Node = Struct.new(:text, :index, :children, :next, :prev, :parsed, :scanner)
 
-  DIRECT_BLOCK_STATEMENTS = %w[while for with]
+  DIRECT_BLOCK_STATEMENTS = %w[while for with].map {|s| s.to_sym}
 
   attr :jabl_context
   private :jabl_context
@@ -45,26 +41,21 @@ class Jabl
   private
 
   def compile(node, tabs)
-    return '' if node.parsed
-    if node.children.empty?
-      if node.scanner.scan /\./; compile_scoped node, tabs
-      elsif node.scanner.keyword :switch; compile_switch node, tabs
-      else tabs(tabs) + node.text + ";\n"
-      end
-    else
-      DIRECT_BLOCK_STATEMENTS.each do |name|
-        return compile_block(name, node, tabs) if node.scanner.keyword name
-      end
+    return '' if node.parsed?
 
-      if node.scanner.keyword :fun; compile_fun node, tabs
-      elsif node.scanner.keyword :if; compile_if node, tabs
-      elsif node.scanner.keyword :do; compile_do_while node, tabs
-      elsif node.scanner.keyword :try; compile_try node, tabs
-      elsif node.scanner.keyword :let; parse_let node, tabs
-      elsif node.scanner.scan /\$/; compile_selector node, tabs
-      elsif node.scanner.scan /\:/; compile_event node, tabs
-      else; raise "Invalid parse node: #{node.text.inspect}"
-      end
+    case node.name
+    when *DIRECT_BLOCK_STATEMENTS; compile_block(name, node, tabs)
+    when :scoped; compile_scoped node, tabs
+    when :switch; compile_switch node, tabs
+    when :text; tabs(tabs) + node[:text] + ";\n"
+    when :fun; compile_fun node, tabs
+    when :if; compile_if node, tabs
+    when :do; compile_do_while node, tabs
+    when :try; compile_try node, tabs
+    when :let; compile_let node[:terms], tabs, node.children
+    when :selector; compile_selector node, tabs
+    when :event; compile_event node, tabs
+    else; raise "Invalid parse node: #{node.text.inspect}"
     end
   end
 
@@ -73,148 +64,65 @@ class Jabl
   end
 
   def compile_fun(node, tabs)
-    node.scanner.whitespace!
-    name = node.scanner.identifier!
-
-    args = []
-    if node.scanner.scan(/\(/)
-      loop do
-        node.scanner.whitespace
-        args << node.scanner.identifier!
-        node.scanner.whitespace
-        unless node.scanner.scan(/,/)
-          node.scanner.scan!(/\)/)
-          break
-        end
-      end
-    end
-
     <<END
-#{tabs(tabs)}function #{name}(#{args.join(', ')}) {
+#{tabs(tabs)}function #{node[:name]}(#{node[:args].join(', ')}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
 END
   end
 
   def compile_if(node, tabs)
-    str = compile_block('if', node, tabs)
-    while node.next && node.next.scanner.keyword(:else)
-      node = node.next
-      node.parsed = true
-      str.rstrip! << ' ' << compile_else(node, tabs)
-    end
-    str
+    compile_block(node, tabs).rstrip + node[:else].map {|n| compile_else(n, tabs)}.join + "\n"
   end
 
   def compile_else(node, tabs)
-    if node.scanner.whitespace
-      node.scanner.keyword! 'if'
-      compile_block('else if', node, tabs).lstrip
-    else
-      <<END
-else {
-#{compile_nodes(node.children, tabs + 1)}}
-END
-    end
+    " " + compile_block(node, tabs, 'else' + (node[:expr] ? ' if' : '')).rstrip
   end
 
   def compile_do_while(node, tabs)
-    next_node = node.next
-    next_node.scanner.keyword! 'while'
-    next_node.scanner.whitespace!
-    exp = next_node.scanner.scan!(/.+/)
-    next_node.parsed = true
-
-    <<END
-#{tabs(tabs)}do {
-#{compile_nodes(node.children, tabs + 1)}} while (#{exp});
-END
+    compile_block(node, tabs).lstrip + " while (#{node[:expr]});"
   end
 
   def compile_switch(node, tabs)
-    node.scanner.whitespace!
     str = <<END
-#{tabs(tabs)}switch (#{node.scanner.scan!(/.+/)}) {
+#{tabs(tabs)}switch (#{node[:expr]}) {
 END
 
-    while node = node.next
-      if node.scanner.keyword(:case)
-        node.parsed = true
-        node.scanner.whitespace!
-        clause = "case #{node.scanner.scan!(/.+/)}"
-      elsif node.scanner.keyword(:default)
-        node.parsed = true
-        clause = "default"
+    node[:cases].each do |n|
+      str << tabs(tabs)
+      if n.name == :default
+        str << "default"
       else
-        break
+        str << "case #{n[:expr]}"
       end
-
-      str << <<END
-#{tabs(tabs)}#{clause}:
-#{compile_nodes(node.children, tabs + 1).rstrip}
-END
+      str << ":\n" << compile_nodes(n.children, tabs + 1)
     end
 
-    str + tabs(tabs) + "}\n"
+    str << tabs(tabs) << "}\n"
   end
 
   def compile_try(node, tabs)
-    node.scanner.eos!
-    str = <<END
-#{tabs(tabs)}try {
-#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
-END
+    str = compile_block(node, tabs)
 
-    if node.next && node.next.scanner.keyword(:catch)
-      node = node.next
-      node.parsed = true
-      str.rstrip! << ' ' << compile_block(:catch, node, tabs).lstrip
+    if node[:catch]
+      str.rstrip!
+      str << ' ' << compile_block(node[:catch],   tabs).lstrip
     end
 
-    if node.next && node.next.scanner.keyword(:finally)
-      node = node.next
-      node.parsed = true
-      str.rstrip! << ' ' << <<END
-finally {
-#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
-END
+    if node[:finally]
+      str.rstrip!
+      str << ' ' << compile_block(node[:finally], tabs).lstrip
     end
 
     str
   end
 
-  def parse_let(node, tabs)
-    node.scanner.whitespace!
-
-    terms = []
-    loop do
-      term = []
-      node.scanner.whitespace
-      term << node.scanner.identifier!
-      node.scanner.whitespace
-      node.scanner.scan!(/=/)
-      node.scanner.whitespace
-      term << node.scanner.scan!(/[^,]+/) # TODO: Actually parse expression
-      terms << term
-      unless node.scanner.scan(/,/)
-        node.scanner.eos!
-        break
-      end
-    end
-
-    compile_let(terms, tabs, node.children)
-  end
-
-  def compile_block(name, node, tabs)
-    node.scanner.whitespace!
-
-    <<END
-#{tabs(tabs)}#{name} (#{node.scanner.scan!(/.+/)}) {
-#{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}}
-END
+  def compile_block(node, tabs, name = node.name)
+    tabs(tabs) + name.to_s + (node[:expr] && " (#{node[:expr]})").to_s + " {\n" +
+      compile_nodes(node.children, tabs + 1) + tabs(tabs) + "}"
   end
 
   def compile_selector(node, tabs)
-    compile_context("$(#{node.scanner.scan!(/.+/).inspect})", tabs, node.children)
+    compile_context("$(#{node[:text].inspect})", tabs, node.children)
   end
 
   def compile_context(var, tabs, children)
@@ -233,21 +141,12 @@ END
   end
 
   def compile_scoped(node, tabs)
-    "#{tabs(tabs)}#{jabl_context}.#{node.scanner.scan!(/.+/)};\n"
+    "#{tabs(tabs)}#{jabl_context}.#{node[:content]};\n"
   end
 
   def compile_event(node, tabs)
-    event = node.scanner.identifier!
-    if node.scanner.scan(/\(/)
-      node.scanner.whitespace
-      var = event.scanner.identifier
-      node.scanner.whitespace
-      node.scanner.scan!(/\)/)
-    end
-    node.scanner.eos!
-
     <<END
-#{tabs(tabs)}#{jabl_context}.on(#{event.inspect}, function(#{var.inspect if var}) {
+#{tabs(tabs)}#{jabl_context}.on(#{node[:name].inspect}, function(#{node[:var]}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}});
 END
   end
@@ -296,8 +195,7 @@ END
     end
     nodes.each do |n|
       n.children = parse_nodes(n.children)
-      n.scanner = Scanner.new(n.text)
-      #_, n.parsed = ParseNode.from_node(NestParser.parse(NestLexer.lex(n.text)))
+      n.parse!
     end
   end
 
