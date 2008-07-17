@@ -17,7 +17,8 @@ class Jabl
   end
 
   def render
-    @tree.map {|n| compile(n, 0)}.join
+    "_jabl_context = $(document);\n" +
+      @tree.map {|n| compile(n, 0)}.join
   end
 
   def pretty_inspect(nodes = @tree, tabs = 0)
