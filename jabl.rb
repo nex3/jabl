@@ -11,14 +11,19 @@ class Jabl
 
   DIRECT_BLOCK_STATEMENTS = %w[while for with]
 
+  attr :jabl_context
+  private :jabl_context
+
   def initialize(string)
     @tree, _ = tree(tabulate(string))
     parse_nodes @tree
   end
 
   def render
-    "_jabl_context = $(document);\n" +
-      @tree.map {|n| compile(n, 0)}.join
+    let_context("_jabl_context") do
+      "#{jabl_context} = $(document);\n" +
+        @tree.map {|n| compile(n, 0)}.join
+    end
   end
 
   def pretty_inspect(nodes = @tree, tabs = 0)
@@ -213,7 +218,7 @@ END
   end
 
   def compile_context(var, tabs, children)
-    compile_let([[:_jabl_context, var]], tabs, children)
+    let_context("_jabl_context") { compile_let([[:_jabl_context, var]], tabs, children) }
   end
 
   def compile_let(vars, tabs, children)
@@ -224,7 +229,7 @@ END
   end
 
   def compile_scoped(node, tabs)
-    "#{tabs(tabs)}_jabl_context.#{node.scanner.scan!(/.+/)};\n"
+    "#{tabs(tabs)}#{jabl_context}.#{node.scanner.scan!(/.+/)};\n"
   end
 
   def compile_event(node, tabs)
@@ -238,9 +243,16 @@ END
     node.scanner.eos!
 
     <<END
-#{tabs(tabs)}_jabl_context.on(#{event.inspect}, function(#{var.inspect if var}) {
+#{tabs(tabs)}#{jabl_context}.on(#{event.inspect}, function(#{var.inspect if var}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}});
 END
+  end
+
+  def let_context(str)
+    str, @jabl_context = @jabl_context, str
+    res = yield
+    str, @jabl_context = @jabl_context, str    
+    res
   end
 
   def tabulate(string)
