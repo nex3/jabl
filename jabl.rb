@@ -218,7 +218,11 @@ END
   end
 
   def compile_context(var, tabs, children)
-    let_context("_jabl_context") { compile_let([[:_jabl_context, var]], tabs, children) }
+    if children.size == 1 && children.first.children.empty?
+      let_context(var) { compile(children.first, tabs) }
+    else
+      let_context("_jabl_context") { compile_let([[:_jabl_context, var]], tabs, children) }
+    end
   end
 
   def compile_let(vars, tabs, children)
