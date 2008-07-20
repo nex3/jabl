@@ -1,29 +1,32 @@
 fun checkFeed
   $#feed
-    .load("/live/last_item")
+    load("/live/last_item")
   // Setup the timeout
   setupTimeout(60000)
+
+:ready
+  checkFeed()
 
 fun setupTimeout(time)
   setTimeout(checkFeed, time)
 
-:load
-  $input[@default_value]
-    :focus
-      if @value == @default_value
-        .removeClass("grey")
-        @value = "something"
-    :blur
-      if @value == ''
-        .addClass("grey")
-        @value = @default_value
-    .blur()
-  $form
-    :submit
-      $input[@default_value]
-        .focus()
+$input[@default_value]
+  :focus
+    if @value == @default_value
+      removeClass("grey")
+      @value = "something"
+  :blur
+    if @value == ''
+      addClass("grey")
+      @value = @default_value
+  blur()
 
-  $#comments
-    .autolineheight minWidth: 100, ratio:.03
+$form
+  :submit
+    $input[@default_value]
+      focus()
+
+$#comments
+  autolineheight minWidth: 100, ratio:.03
   
-  checkFeed()
+

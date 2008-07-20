@@ -2,7 +2,7 @@
 
 :ready
   // Selector like an "object" set
-  $#toolbox
+  $#toolbox //#toolbox element has these functions magically
     // Methods
     fun stopHideTimer
       if @timeout
@@ -25,3 +25,18 @@
     &.tools
       :hover appear
       :blur startHideTimer
+
+fun magic_time
+  $#toolbox
+    stopHideTimer()
+    
+
+
+module RedTextOnHover
+  :hover
+    addClass("red_text")
+  :blur
+    removeClass("red_text")
+    
+$.user.name
+  <- RedTextOnHover
