@@ -10,11 +10,11 @@ fun checkFeed
 $input[@default_value]
   :focus
     if @value == @default_value
-      removeClass("grey")
+      this.removeClass("grey")
       @value = "something"
   :blur
     if @value == ''
-      addClass("grey")
+      this.addClass("grey")
       @value = @default_value
   blur()
 
@@ -22,6 +22,3 @@ $form
   :submit
     $input[@default_value]
       focus()
-
-$#comments
-  autolineheight minWidth: 100, ratio:.03
