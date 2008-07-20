@@ -2,13 +2,10 @@ fun checkFeed
   $#feed
     load("/live/last_item")
   // Setup the timeout
-  setupTimeout(60000)
+  setTimeout(checkFeed, 60000)
 
 :ready
   checkFeed()
-
-fun setupTimeout(time)
-  setTimeout(checkFeed, time)
 
 $input[@default_value]
   :focus
@@ -28,5 +25,3 @@ $form
 
 $#comments
   autolineheight minWidth: 100, ratio:.03
-  
-

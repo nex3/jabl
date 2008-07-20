@@ -1,42 +1,25 @@
 
 
 :ready
-  // Selector like an "object" set
-  $#toolbox //#toolbox element has these functions magically
-    // Methods
+  $#toolbox
+
     fun stopHideTimer
       if @timeout
         clearTimeout(@timeout)
         @timeout = null
+
     fun startHideTimer
       stophideTimer()
       @timeout = setTimeout(disappear, 500)
-    fun appear
+
+    fun disappear
       stopHideTimer()
       &.tools
-        show()
-    fun disappear
-      &.tools
         hide()
-      
-    // Events
-    :hover appear
+
     :blur startHideTimer
     &.tools
-      :hover appear
+      :hover
+        dissappear()
+        this.show()
       :blur startHideTimer
-
-fun magic_time
-  $#toolbox
-    stopHideTimer()
-    
-
-
-module RedTextOnHover
-  :hover
-    addClass("red_text")
-  :blur
-    removeClass("red_text")
-    
-$.user.name
-  <- RedTextOnHover
