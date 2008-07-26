@@ -47,7 +47,7 @@ class Jabl
     when *DIRECT_BLOCK_STATEMENTS; compile_block(name, node, tabs)
     when :scoped; compile_scoped node, tabs
     when :switch; compile_switch node, tabs
-    when :text; tabs(tabs) + node[:text] + ";\n"
+    when :text; tabs(tabs) + compile_text(node[:text]) + ";\n"
     when :fun; compile_fun node, tabs
     when :if; compile_if node, tabs
     when :do; compile_do_while node, tabs
@@ -79,12 +79,12 @@ END
   end
 
   def compile_do_while(node, tabs)
-    compile_block(node, tabs).lstrip + " while (#{node[:expr]});"
+    compile_block(node, tabs).lstrip + " while (#{compile_text(node[:expr])});"
   end
 
   def compile_switch(node, tabs)
     str = <<END
-#{tabs(tabs)}switch (#{node[:expr]}) {
+#{tabs(tabs)}switch (#{compile_text(node[:expr])}) {
 END
 
     node[:cases].each do |n|
@@ -92,7 +92,7 @@ END
       if n.name == :default
         str << "default"
       else
-        str << "case #{n[:expr]}"
+        str << "case #{compile_text(n[:expr])}"
       end
       str << ":\n" << compile_nodes(n.children, tabs + 1)
     end
@@ -117,7 +117,7 @@ END
   end
 
   def compile_block(node, tabs, name = node.name)
-    tabs(tabs) + name.to_s + (node[:expr] && " (#{node[:expr]})").to_s + " {\n" +
+    tabs(tabs) + name.to_s + (node[:expr] && " (#{compile_text(node[:expr])})").to_s + " {\n" +
       compile_nodes(node.children, tabs + 1) + tabs(tabs) + "}"
   end
 
@@ -141,7 +141,7 @@ END
   end
 
   def compile_scoped(node, tabs)
-    "#{tabs(tabs)}#{jabl_context}.#{node[:content]};\n"
+    "#{tabs(tabs)}#{jabl_context}.#{compile_text(node[:text])};\n"
   end
 
   def compile_event(node, tabs)
@@ -150,6 +150,14 @@ END
 #{tabs(tabs)}#{jabl_context}.on(#{node[:name].inspect}, function(#{node[:var]}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}});
 END
+  end
+
+  def compile_text(text)
+    text.gsub(/\@([^ ]*) = (.*)/) do |match|
+      "#{jabl_context}.attr(#{$1.inspect}: #{$2})"
+    end.gsub(/@([A-z_])*/) do |match|
+      "#{jabl_context}.attr(#{$1.inspect})"
+    end
   end
 
   def let_context(str)

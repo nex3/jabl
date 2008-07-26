@@ -34,8 +34,6 @@ class Jabl
         elsif scanner.scan /\:/; parse_event
         else; raise "Invalid parse node: #{text.inspect}"
         end
-        
-        replace_variables(self[:expr])
       end
     end
 
@@ -57,7 +55,7 @@ class Jabl
 
     def parse_scoped
       self.name = :scoped
-      self[:content] = scanner.scan!(/.+/)
+      self[:text] = scanner.scan!(/.+/)
     end
 
     def parse_switch
@@ -86,7 +84,7 @@ class Jabl
 
     def parse_text
       self.name = :text
-      self[:text] = replace_variables(self.text)
+      self[:text] = self.text
     end
 
     def parse_block(name = nil)
@@ -201,21 +199,6 @@ class Jabl
         scanner.scan!(/\)/)
       end
       scanner.eos!
-    end
-
-    def replace_variables(text)
-      if text =~ /@/
-        text.gsub!(/\@([^ ]*) = (.*)/) do |match|
-          var_name, assignment = text.scan(/\@([^ ]*) = (.*)/).first
-          "_jabl_context.attr(#{var_name}: #{assignment})"
-        end
-      
-        text.gsub!(/@[A-z_]*/) do |match|
-          var_name = match.scan(/@([A-z_]*)/).first.first
-          "_jabl_context.attr(#{var_name.inspect})"
-        end
-      end
-      text
     end
   end
 end
