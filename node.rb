@@ -53,6 +53,26 @@ class Jabl
       data[name] = val
     end
 
+    def context_refs
+      @context_refs ||=
+        begin
+          children.inject(0) {|s, c| s + c.context_refs} +
+            context_refs_in(self[:expr]) +
+            case name
+            when :event; 1
+            when :scoped; 1 + context_refs_in(self[:text])
+            when :text; context_refs_in(self[:text])
+            else; 0
+            end
+        end
+    end
+
+    private
+
+    def context_refs_in(text)
+      (text || "").count('@')
+    end
+
     def parse_scoped
       self.name = :scoped
       self[:text] = scanner.scan!(/.+/)

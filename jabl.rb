@@ -126,7 +126,7 @@ END
   end
 
   def compile_context(var, tabs, children)
-    if children.size == 1 && children.first.children.empty?
+    if children.inject(0) {|s, c| s + c.context_refs} < 2
       let_context(var) { compile(children.first, tabs) }
     else
       let_context("_jabl_context") { compile_let([[:_jabl_context, var]], tabs, children) }
