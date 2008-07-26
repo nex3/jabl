@@ -1,25 +1,26 @@
 
 
-:ready
-  $#toolbox
+$#toolbox
+  fun stopHideTimer
+    if @timeout
+      clearTimeout(@timeout)
+      @timeout = null
 
-    fun stopHideTimer
-      if @timeout
-        clearTimeout(@timeout)
-        @timeout = null
+  fun startHideTimer
+    stophideTimer()
+    @timeout = setTimeout(disappear, 500)
 
-    fun startHideTimer
-      stophideTimer()
-      @timeout = setTimeout(disappear, 500)
-
-    fun disappear
-      stopHideTimer()
-      &.tools
-        hide()
-
-    :blur startHideTimer
+  fun disappear
+    stopHideTimer()
     &.tools
-      :hover
-        dissappear()
-        this.show()
-      :blur startHideTimer
+      hide()
+
+  :blur startHideTimer
+  &.tools
+    :hover
+      dissappear()
+      this.show()
+    :blur startHideTimer
+    
+$#toolbox
+  startHideTimer()

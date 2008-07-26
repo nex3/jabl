@@ -145,6 +145,7 @@ END
   end
 
   def compile_event(node, tabs)
+    node[:name] = "load" if node[:name] == "ready"
     <<END
 #{tabs(tabs)}#{jabl_context}.on(#{node[:name].inspect}, function(#{node[:var]}) {
 #{compile_nodes(node.children, tabs + 1)}#{tabs(tabs)}});
