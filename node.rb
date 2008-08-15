@@ -12,28 +12,23 @@ class Jabl
 
     def parse!
       return if parsed?
-      if children.empty?
-        if scanner.scan /\./; parse_scoped
-        elsif scanner.keyword :switch; parse_switch
-        else parse_text
+      DIRECT_BLOCK_STATEMENTS.each do |name|
+        if scanner.keyword name
+          parse_block(name)
+          return
         end
-      else
-        DIRECT_BLOCK_STATEMENTS.each do |name|
-          if scanner.keyword name
-            parse_block(name)
-            return
-          end
-        end
+      end
 
-        if scanner.keyword :fun; parse_fun
-        elsif scanner.keyword :if; parse_if
-        elsif scanner.keyword :do; parse_do_while
-        elsif scanner.keyword :try; parse_try
-        elsif scanner.keyword :let; parse_let
-        elsif scanner.scan /%/; parse_selector
-        elsif scanner.scan /\:/; parse_event
-        else; raise "Invalid parse node: #{text.inspect}"
-        end
+      if scanner.keyword :fun; parse_fun
+      elsif scanner.keyword :if; parse_if
+      elsif scanner.keyword :do; parse_do_while
+      elsif scanner.keyword :try; parse_try
+      elsif scanner.keyword :let; parse_let
+      elsif scanner.scan /%/; parse_selector
+      elsif scanner.scan /\:/; parse_event
+      elsif scanner.scan /\./; parse_scoped
+      elsif scanner.keyword :switch; parse_switch
+      else parse_text
       end
     end
 
