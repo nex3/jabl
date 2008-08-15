@@ -2,7 +2,10 @@ require 'scanner'
 
 class Jabl
   class Node < Struct.new(
-      :text, :index, :children, :next, :prev, :scanner, :parsed, :data, :name)
+      :text, :index, :children, :scanner, :parsed, :data, :name)
+
+    attr_writer :getter
+    attr_writer :peek_next
 
     def initialize(*args)
       super
@@ -11,7 +14,7 @@ class Jabl
     end
 
     def parse!
-      return if parsed?
+      raise "Jabl bug: parsing parsed node" if parsed?
       DIRECT_BLOCK_STATEMENTS.each do |name|
         if scanner.keyword name
           parse_block(name)
@@ -62,7 +65,16 @@ class Jabl
         end
     end
 
-    private
+    def get!
+      self.parsed = true
+      @getter.call
+    end
+
+    protected
+
+    def peek_next
+      @next ||= @peek_next.call
+    end
 
     def context_refs_in(text)
       (text || "").count('@')
@@ -80,15 +92,15 @@ class Jabl
 
       self[:cases] = []
       node = self
-      while node = node.next
+      while node = node.peek_next
         if node.scanner.keyword(:case)
-          node.parsed = true
+          node.get!
           node.scanner.whitespace!
           node.name = :case
           node[:expr] = node.scanner.scan!(/.+/)
           self[:cases] << node
         elsif node.scanner.keyword(:default)
-          node.parsed = true
+          node.get!
           node.name = :default
           self[:cases] << node
         else
@@ -133,11 +145,11 @@ class Jabl
 
       self[:else] = []
       node = self
-      while node.next && node.next.scanner.keyword(:else)
-        node = node.next
+      while node.peek_next && node.peek_next.scanner.keyword(:else)
+        node = node.peek_next
+        node.get!
         self[:else] << node
         node.parse_else
-        node.parsed = true
       end
     end
 
@@ -151,10 +163,10 @@ class Jabl
 
     def parse_do_while
       self.name = :do_while
-      self.next.scanner.keyword! 'while'
-      self.next.scanner.whitespace!
-      self[:expr] = self.next.scanner.scan!(/.+/)
-      self.next.parsed = true
+      self.peek_next.scanner.keyword! 'while'
+      self.peek_next.scanner.whitespace!
+      self[:expr] = self.peek_next.scanner.scan!(/.+/)
+      self.peek_next.get!
     end
 
     def parse_try
@@ -162,17 +174,17 @@ class Jabl
       scanner.eos!
 
       node = self
-      if node.next && node.next.scanner.keyword(:catch)
-        node = node.next
+      if node.peek_next && node.peek_next.scanner.keyword(:catch)
+        node = node.peek_next
         node.parse_block 'catch'
-        node.parsed = true
+        node.get!
         self[:catch] = node
       end
 
-      if node.next && node.next.scanner.keyword(:finally)
-        node = node.next
+      if node.peek_next && node.peek_next.scanner.keyword(:finally)
+        node = node.peek_next
         node.name = :finally
-        node.parsed = true
+        node.get!
         self[:finally] = node
       end
     end

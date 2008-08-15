@@ -12,7 +12,6 @@ class Jabl
 
   def initialize(string)
     @tree, _ = tree(tabulate(string))
-    parse_nodes @tree
   end
 
   def render
@@ -41,8 +40,7 @@ class Jabl
   private
 
   def compile(node, tabs)
-    return '' if node.parsed?
-
+    return if node.parsed?
     case node.name
     when *DIRECT_BLOCK_STATEMENTS; compile_block(name, node, tabs)
     when :scoped; compile_scoped node, tabs
@@ -186,26 +184,28 @@ END
   def tree(arr, i = 0)
     base = arr[i].tabs
     nodes = []
-    while (line = arr[i]) && line.tabs >= base
+    peek_next = lambda do
+      break nil unless (line = arr[i]) && line.tabs >= base
       if line.tabs > base
         nodes.last.children, i = tree(arr, i)
+        peek_next.call
       else
-        nodes << Node.new(line.text, line.index, [])
-        i += 1
+        node = Node.new(line.text, line.index, [])
+        node.peek_next = peek_next
+        node.getter = lambda do
+          i += 1
+          nodes << node
+        end
+        node
       end
     end
-    return nodes, i
-  end
 
-  def parse_nodes(nodes)
-    nodes.each_cons(2) do |n, s|
-      n.next = s
-      s.prev = n if s
+    while node = peek_next.call
+      node.get!
+      node.parsed = false
+      node.parse!
     end
-    nodes.each do |n|
-      n.children = parse_nodes(n.children)
-      n.parse!
-    end
+    return nodes, i
   end
 
   def tabs(tabs)
