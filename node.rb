@@ -30,7 +30,7 @@ class Jabl
         elsif scanner.keyword :do; parse_do_while
         elsif scanner.keyword :try; parse_try
         elsif scanner.keyword :let; parse_let
-        elsif scanner.scan /\$/; parse_selector
+        elsif scanner.scan /%/; parse_selector
         elsif scanner.scan /\:/; parse_event
         else; raise "Invalid parse node: #{text.inspect}"
         end
