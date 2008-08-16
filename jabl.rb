@@ -43,14 +43,13 @@ class Jabl
     return if node.parsed?
     case node.name
     when *DIRECT_BLOCK_STATEMENTS; compile_block(name, node, tabs)
-    when :scoped; compile_scoped node, tabs
     when :switch; compile_switch node, tabs
-    when :text; tabs(tabs) + compile_text(node[:text]) + ";\n"
+    when :text; tabs(tabs) + compile_js(node[:expr]) + ";\n"
     when :fun; compile_fun node, tabs
     when :if; compile_if node, tabs
     when :do; compile_do_while node, tabs
     when :try; compile_try node, tabs
-    when :let; compile_let node[:terms], tabs, node.children
+    when :let; compile_let(node[:terms].map {|name, js| [name, compile_js(js)]}, tabs, node.children)
     when :selector; compile_selector node, tabs
     when :event; compile_event node, tabs
     else; raise "Invalid parse node: #{node.text.inspect}"
@@ -77,12 +76,12 @@ END
   end
 
   def compile_do_while(node, tabs)
-    compile_block(node, tabs).lstrip + " while (#{compile_text(node[:expr])});"
+    compile_block(node, tabs).lstrip + " while (#{compile_js(node[:expr])});"
   end
 
   def compile_switch(node, tabs)
     str = <<END
-#{tabs(tabs)}switch (#{compile_text(node[:expr])}) {
+#{tabs(tabs)}switch (#{compile_js(node[:expr])}) {
 END
 
     node[:cases].each do |n|
@@ -90,7 +89,7 @@ END
       if n.name == :default
         str << "default"
       else
-        str << "case #{compile_text(n[:expr])}"
+        str << "case #{compile_js(n[:expr])}"
       end
       str << ":\n" << compile_nodes(n.children, tabs + 1)
     end
@@ -115,7 +114,7 @@ END
   end
 
   def compile_block(node, tabs, name = node.name)
-    tabs(tabs) + name.to_s + (node[:expr] && " (#{compile_text(node[:expr])})").to_s + " {\n" +
+    tabs(tabs) + name.to_s + (node[:expr] && " (#{compile_js(node[:expr])})").to_s + " {\n" +
       compile_nodes(node.children, tabs + 1) + tabs(tabs) + "}"
   end
 
@@ -138,10 +137,6 @@ END
 END
   end
 
-  def compile_scoped(node, tabs)
-    "#{tabs(tabs)}#{jabl_context}.#{compile_text(node[:text])};\n"
-  end
-
   def compile_event(node, tabs)
     node[:name] = "load" if node[:name] == "ready"
     <<END
@@ -150,12 +145,8 @@ END
 END
   end
 
-  def compile_text(text)
-    text.gsub(/\@([^ ]*) = (.*)/) do |match|
-      "#{jabl_context}.attr(#{$1.inspect}: #{$2})"
-    end.gsub(/@([A-z_])*/) do |match|
-      "#{jabl_context}.attr(#{$1.inspect})"
-    end
+  def compile_js(js)
+    js.to_ecma(jabl_context)
   end
 
   def let_context(str)
@@ -186,7 +177,6 @@ END
     nodes = []
     raw_next = lambda do
       line = arr[i]
-      line.raw_next = raw_next
       i += 1
       line
     end

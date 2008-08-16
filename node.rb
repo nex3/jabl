@@ -1,4 +1,5 @@
 require 'scanner'
+require 'rkelly'
 
 class Jabl
   class Node < Struct.new(
@@ -30,7 +31,6 @@ class Jabl
       elsif scanner.keyword :let; parse_let
       elsif scanner.scan /%/; parse_selector
       elsif scanner.scan /\:/; parse_event
-      elsif scanner.scan /\./; parse_scoped
       elsif scanner.keyword :switch; parse_switch
       else parse_text
       end
@@ -59,8 +59,7 @@ class Jabl
             context_refs_in(self[:expr]) +
             case name
             when :event; 1
-            when :scoped; 1 + context_refs_in(self[:text])
-            when :text; context_refs_in(self[:text])
+            when :let; self[:terms].inject(0) {|s, (_, js)| s + js.context_refs}
             else; 0
             end
         end
@@ -81,19 +80,30 @@ class Jabl
       @next ||= @peek_next.call
     end
 
-    def context_refs_in(text)
-      (text || "").count('@')
+    def parse_js(*start)
+      text = scanner.rest.dup
+      until js = parse_js_text(text, *start)
+        text << raw_next.text
+      end
+      js
     end
 
-    def parse_scoped
-      self.name = :scoped
-      self[:text] = scanner.scan!(/.+/)
+    def parse_js_text(text, *start)
+      RKelly::Parser.new.parse(text, *start)
+    rescue RKelly::ParserError => e
+      # EOF means try appending another line
+      raise e unless e.token_value == false
+    end
+
+    def context_refs_in(js)
+      return 0 unless js
+      js.context_refs
     end
 
     def parse_switch
       self.name = :switch
       scanner.whitespace!
-      self[:expr] = scanner.scan!(/.+/)
+      self[:expr] = parse_js
 
       self[:cases] = []
       node = self
@@ -102,7 +112,7 @@ class Jabl
           node.get!
           node.scanner.whitespace!
           node.name = :case
-          node[:expr] = node.scanner.scan!(/.+/)
+          node[:expr] = parse_js
           self[:cases] << node
         elsif node.scanner.keyword(:default)
           node.get!
@@ -116,14 +126,14 @@ class Jabl
 
     def parse_text
       self.name = :text
-      self[:text] = self.text
+      self[:expr] = parse_js
     end
 
     def parse_block(name = nil)
       self.name = name.to_sym if name
 
       scanner.whitespace!
-      self[:expr] = scanner.scan!(/.+/)
+      self[:expr] = parse_js
     end
 
     def parse_fun
@@ -170,7 +180,7 @@ class Jabl
       self.name = :do_while
       self.peek_next.scanner.keyword! 'while'
       self.peek_next.scanner.whitespace!
-      self[:expr] = self.peek_next.scanner.scan!(/.+/)
+      self[:expr] = self.peek_next.parse_js
       self.peek_next.get!
     end
 
@@ -197,22 +207,7 @@ class Jabl
     def parse_let
       self.name = :let
       scanner.whitespace!
-
-      self[:terms] = []
-      loop do
-        term = []
-        scanner.whitespace
-        term << scanner.identifier!
-        scanner.whitespace
-        scanner.scan!(/=/) # Emacs fix: /)
-        scanner.whitespace
-        term << scanner.scan!(/[^,]+/) # TODO: Actually parse expression
-        self[:terms] << term
-        unless scanner.scan(/,/)
-          scanner.eos!
-          break
-        end
-      end
+      self[:terms] = parse_js :LET
     end
 
     def parse_selector
