@@ -126,7 +126,7 @@ class Jabl
 
     def parse_text
       self.name = :text
-      self[:expr] = parse_js
+      self[:expr] = parse_js :STMT
     end
 
     def parse_block(name = nil)

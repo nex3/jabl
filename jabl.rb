@@ -44,7 +44,7 @@ class Jabl
     case node.name
     when *DIRECT_BLOCK_STATEMENTS; compile_block(name, node, tabs)
     when :switch; compile_switch node, tabs
-    when :text; tabs(tabs) + compile_js(node[:expr]) + ";\n"
+    when :text; tabs(tabs) + compile_js(node[:expr]) + "\n"
     when :fun; compile_fun node, tabs
     when :if; compile_if node, tabs
     when :do; compile_do_while node, tabs
