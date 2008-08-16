@@ -184,6 +184,12 @@ END
   def tree(arr, i = 0)
     base = arr[i].tabs
     nodes = []
+    raw_next = lambda do
+      line = arr[i]
+      line.raw_next = raw_next
+      i += 1
+      line
+    end
     peek_next = lambda do
       break nil unless (line = arr[i]) && line.tabs >= base
       if line.tabs > base
@@ -191,6 +197,7 @@ END
         peek_next.call
       else
         node = Node.new(line.text, line.index, [])
+        node.raw_next = raw_next
         node.peek_next = peek_next
         node.getter = lambda do
           i += 1

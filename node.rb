@@ -6,6 +6,7 @@ class Jabl
 
     attr_writer :getter
     attr_writer :peek_next
+    attr_writer :raw_next
 
     def initialize(*args)
       super
@@ -71,6 +72,10 @@ class Jabl
     end
 
     protected
+
+    def raw_next
+      @raw ||= @raw_next.call
+    end
 
     def peek_next
       @next ||= @peek_next.call
