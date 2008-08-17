@@ -1,7 +1,8 @@
+require 'rubygems'
+require 'jabl-rkelly'
 require 'jabl/scanner'
-require 'rkelly'
 
-class Jabl
+module Jabl
   class Node < Struct.new(
       :text, :index, :children, :scanner, :parsed, :data, :name)
 
@@ -17,7 +18,7 @@ class Jabl
 
     def parse!
       raise "Jabl bug: parsing parsed node" if parsed?
-      DIRECT_BLOCK_STATEMENTS.each do |name|
+      Jabl::Engine::DIRECT_BLOCK_STATEMENTS.each do |name|
         if scanner.keyword name
           parse_block(name)
           return
@@ -89,8 +90,8 @@ class Jabl
     end
 
     def parse_js_text(text, *start)
-      RKelly::Parser.new.parse(text, *start)
-    rescue RKelly::ParserError => e
+      Jabl::RKelly::Parser.new.parse(text, *start)
+    rescue Jabl::RKelly::ParserError => e
       # EOF means try appending another line
       raise e unless e.token_value == false
     end

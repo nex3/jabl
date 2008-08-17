@@ -1,6 +1,6 @@
 require 'strscan'
 
-class Jabl
+module Jabl
   class Scanner < StringScanner
     def keyword(str)
       scan(/\b#{Regexp.escape(str.to_s)}\b/)
