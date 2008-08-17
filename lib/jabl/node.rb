@@ -1,4 +1,4 @@
-require 'scanner'
+require 'jabl/scanner'
 require 'rkelly'
 
 class Jabl

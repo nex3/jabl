@@ -1,6 +1,8 @@
-require 'rubygems'
+dir = File.dirname(__FILE__)
+$LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
+require 'jabl/node'
+
 require 'enumerator'
-require 'node'
 
 class Jabl
   Line = Struct.new(:text, :tabs, :index)
