@@ -1,0 +1,3 @@
+[submodule "vendor/jabl-rkelly"]
+	path = vendor/jabl-rkelly
+	url = git://github.com/nex3/rkelly
